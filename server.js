@@ -2,47 +2,58 @@ const express = require("express")
 const app = express()
 const http = require('http').Server(app)
 const io = require("socket.io")(http)
-const fs = require("fs")
 const path = require("path")
-
+const fs = require("fs")
+const PORT = process.env.PORT || 80
 const jpeg = require('jpeg-js')
 
-let prevImg = null
+let prevImgBuffer = null
+let fsSwitch = false
 
 io.on('connection', function(socket){
     console.log(`conn :  ${socket.id}`)
     socket.on("streamer", (data) => {
         const { dataURL } = data
         const buffer = new Buffer(dataURL.split(",")[1], 'base64')
-        // console.log(jpeg.decode(buffer))
-        if(prevImg === null){
-            prevImg = buffer
+        if(prevImgBuffer === null){
+            prevImgBuffer = buffer
         } else {
-            fs.writeFileSync("test.jpg", buffer)
-            fs.writeFileSync("tes1.jpg", prevImg)
-            // console.log(prevImg)
-            // console.log(buffer)
             const changeRate = calculateJpgChangeRate({
-                jpgBufs : [prevImg, buffer]
+                jpgBufs : [prevImgBuffer, buffer]
             })
-            console.log(changeRate)
+            // console.log(changeRate)
             if(changeRate >= 0.12){
+                //motion detected
+                if(fsSwitch === false){
+                    let fileName = Number(new Date()) + ".jpg"
+                    fs.writeFileSync(path.join(__dirname, 'detected', fileName), buffer)
+                    fsSwitch = true
+                    setTimeout(() => {
+                        fsSwitch = false
+                    }, 1000)
+                }
                 io.emit("warning")
             }
-            prevImg = buffer
+            prevImgBuffer = buffer
         }
+        io.emit("streamer-data", {
+            dataURL
+        })
     })
 })
 
 app.set("view engine", "pug")
 app.set("views", path.join(__dirname, "views"))
 app.use("/public", express.static(path.join(__dirname, "public")))
-app.get("*", (req, res) => {
+app.get("/streamer", (req, res) => {
     res.render("streamer")
 })
+app.get("/client", (req, res) => {
+    res.render("client")
+})
 
-http.listen(80, () => {
-    console.log(80)
+http.listen(PORT, () => {
+    console.log(`litening on PORT ${PORT}`)
 })
 
 function calculateJpgChangeRate({
@@ -58,11 +69,6 @@ function calculateJpgChangeRate({
         if(sub > 5){
             count ++
         }
-        // if(decodedJpg1.data[i] !== decodedJpg2.data[i]){
-        //     // console.log(decodedJpg1.data[i])
-        //     // console.log(decodedJpg2.data[i])
-
-        // }
     }   
     return count / Uint8ArrayLength
 }

@@ -1,0 +1,11 @@
+doctype html
+html
+    head
+        link(rel="stylesheet" type="text/css" href="/public/client.css")
+    body
+        div
+            img(id="img" width="426" height="240")
+            audio(id="audio" controls)
+                source(src="/public/warning.mp3" type="audio/mpeg")              
+        script(src="/socket.io/socket.io.js")
+        script(src="/public/client.js")
